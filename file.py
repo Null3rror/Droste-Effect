@@ -3,6 +3,8 @@ import cv2
 import random
 
 repeats = int(input())
+r1 = 0.2
+r2 = 0.9
 
 def Init(imgAddress):
     img = cv2.imread(imgAddress, cv2.IMREAD_COLOR)
@@ -14,15 +16,19 @@ def Init(imgAddress):
     Z = X + (1j * Y);
     return img, r, c, Z
 
-def TILE(z, r1, r2, cOrig, j):
-    print(np.imag(z), j)
-    z = (1j * np.imag(z)) + np.mod(np.real(z) ,np.log(r2/r1)) * (int(j/cOrig) + 1)
-    return z;
+def TILE(W, r, c):
+    W1 = np.array([ [complex] * c * repeats] * r )
+    for i in range(repeats-1):
+        if i == 0:
+            W1 = np.concatenate([W, W + (i+1) * np.log(r2/r1)], axis = 1)
+        else:
+            W1 = np.concatenate([W1, W + (i+1) * np.log(r2/r1)], axis = 1)
+    return W1;
 
 def ROTATION(z, f, tetha):
     return z * f * np.exp(1j * tetha)
 
-def LOG(z, r1, r2):
+def LOG(z):
     zLength = np.absolute(z)
     if min(r1, r2) <= zLength and zLength <= max(r1, r2):
         return(np.log(z/min(r1,r2)))
@@ -33,20 +39,9 @@ def EXP(z):
 
 def LogTransform(Z, r, c):
     Z1 = Z[:r, :c].copy()
-    r1 = 0.2
-    r2 = 0.9
     for i in range(r):
         for j in range(c):
-            Z1[i][j] = LOG(Z1[i][j], r1, r2)
-    return(Z1)
-
-def TILETransform(Z, r, c, cOrig):
-    Z1 = Z[:r, :c].copy()
-    r1 = 0.2
-    r2 = 0.9
-    for i in range(r):
-        for j in range(c):
-            Z1[i][j] = TILE(Z1[i][j], r1, r2, cOrig, j)
+            Z1[i][j] = LOG(Z1[i][j])
     return(Z1)
 
 def ExpTransform(Z, r, c):
@@ -54,7 +49,6 @@ def ExpTransform(Z, r, c):
     for i in range(r):
         for j in range(c):
             Z1[i][j] = EXP(Z1[i][j])
-
     return(Z1)
 
 def RotationTransformPi4(Z, r, c):
@@ -70,30 +64,26 @@ def RotationTransform(Z, r, c):
     r2 = 0.9
     alpha = np.arctan( ( np.log(max(r2, r1) / min(r1, r2) ) / ( 2 * np.pi ) ) )
     f = np.cos(alpha)
-    try:
-        for i in range(r):
-            for j in range(c):
-                Z1[i][j] = ROTATION(Z1[i][j], f, alpha)
-        return(Z1)
-    except IndexError:
-        print(i, j)
+    for i in range(r):
+        for j in range(c):
+            Z1[i][j] = ROTATION(Z1[i][j], f, alpha)
+    return(Z1)
+
 def makeNewXY(W, wmax, x):
     return(np.multiply( np.add(np.divide(W, wmax), 1)  , x/2))
 
 def recreateImage(Xnew, Ynew, img, r, c, repeat):
-    try:
-        newImg = np.zeros([r , c*repeat, 3])
-        for i in range(r):
-            for j in range(c*repeat):
-                for k in range(3):
-                    if int(Xnew[i, j]) == c * repeat:
-                        Xnew[i, j] = c * repeat - 1
-                    if int(Ynew[i, j]) == r:
-                        Ynew[i, j] = r  - 1
-                    newImg[int(Ynew[i, j])][int(Xnew[i, j])][k] = img[i, j % c, k]
-        return newImg
-    except IndexError:
-        print(int(Ynew[i, j]), int(Xnew[i, j]), i, j, newImg.shape)
+    newImg = np.zeros([r , c*repeat, 3])
+    for i in range(r):
+        for j in range(c*repeat):
+            for k in range(3):
+                if int(Xnew[i, j]) == c * repeat:
+                    Xnew[i, j] = c * repeat - 1
+                if int(Ynew[i, j]) == r:
+                    Ynew[i, j] = r  - 1
+                newImg[int(Ynew[i, j])][int(Xnew[i, j])][k] = img[i, j % c, k]
+    return newImg
+
 
 def CalculateXNewYNew(Z, r, c):
     W = LogTransform(Z, r, c)
@@ -107,19 +97,18 @@ def CalculateXNewYNew(Z, r, c):
     return Xnew, Ynew
 
 def CalculateXNewYNewTILED(Z, r, c):
-    Z = np.tile(Z, (1, repeats))
     print(Z.shape)
-    W = LogTransform(Z, r, c * repeats)
-    W = TILETransform(W, r, c * repeats, c)
-    #W = RotationTransform(W, r, c * repeats)
-    #W = ExpTransform(W, r, c * repeats)
-    Wx = np.real(W)
-    Wy = np.imag(W)
+    W = LogTransform(Z, r, c)
+    W1 = TILE(W, r, c)
+    print(W1.shape)
+    W1 = RotationTransform(W1, r, c * repeats)
+    W1 = ExpTransform(W1, r, c * repeats)
+    Wx = np.real(W1)
+    Wy = np.imag(W1)
     wxmax = np.absolute(Wx).max()
     wymax = np.absolute(Wy).max()
     Xnew = makeNewXY(Wx, wxmax, c * repeats)
     Ynew = makeNewXY(Wy, wymax, r)
-    #print(Xnew.max(), Ynew.max())
     return Xnew, Ynew
 
 img, r, c, Z = Init('clock.jpg')
@@ -129,4 +118,4 @@ else:
     Xnew, Ynew = CalculateXNewYNew(Z, r, c)
 newImg = recreateImage(Xnew, Ynew, img, r, c, repeats)
 cv2.imwrite("droste.jpg", newImg);
-#input()
+input()
