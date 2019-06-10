@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import random
 
-repeats = int(input())
+repeats = 3
 r1 = 0.2
 r2 = 0.9
 
@@ -60,8 +60,6 @@ def RotationTransformPi4(Z, r, c):
 
 def RotationTransform(Z, r, c):
     Z1 = Z[:r, :c].copy()
-    r1 = 0.2
-    r2 = 0.9
     alpha = np.arctan( ( np.log(max(r2, r1) / min(r1, r2) ) / ( 2 * np.pi ) ) )
     f = np.cos(alpha)
     for i in range(r):
@@ -111,11 +109,11 @@ def CalculateXNewYNewTILED(Z, r, c):
     Ynew = makeNewXY(Wy, wymax, r)
     return Xnew, Ynew
 
-img, r, c, Z = Init('clock.jpg')
+img, r, c, Z = Init('PrideCircle.png')
 if repeats != 1:
     Xnew, Ynew = CalculateXNewYNewTILED(Z, r, c)
 else:
     Xnew, Ynew = CalculateXNewYNew(Z, r, c)
 newImg = recreateImage(Xnew, Ynew, img, r, c, repeats)
-cv2.imwrite("droste.jpg", newImg);
-input()
+cv2.imwrite("PrideCircleAfter.png", newImg);
+#input()
