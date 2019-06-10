@@ -18,4 +18,4 @@ Here are some Before and After Images.
 
 
 
-![alt text](Images/DrosteLadyAfter.jpg)
+![alt text](Images/drosteLadyAfter.jpg)
