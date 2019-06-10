@@ -1,2 +1,2 @@
 "# Droste-Effect With Python" 
-[a relative link](Images/clock.jpg)
+![alt text](Images/clock.jpg)
