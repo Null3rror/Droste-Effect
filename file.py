@@ -6,7 +6,7 @@ import random
 class droste:
     def __init__(self, fPath, repeats=3,r1=0.2,r2=0.9):
         self.fPath = fPath
-        self.repeats = 3 # how many turns - Make it >1
+        self.repeats = repeats 
         self.r1 = r1
         self.r2 = r2
 
@@ -158,7 +158,7 @@ class droste:
 
 def main():
     fPath = 'INPUT.png'
-    repeats = 3
+    repeats = 3 # how many turns - Make it >1
     r1      = 0.2
     r2      = 0.9
 
