@@ -1,4 +1,4 @@
-"# Droste-Effect With Python" <br/>
+# Droste-Effect With Python
 Here are some Before and After Images.
 
 
@@ -20,7 +20,7 @@ Here are some Before and After Images.
 
 ![alt text](Images/drosteLadyAfter.jpg)
 
-"# Example Usage" <br/>
+# Example Usage
 ```
 python3 droste.py Input.jpg
 ```
