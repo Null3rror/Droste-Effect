@@ -19,3 +19,8 @@ Here are some Before and After Images.
 
 
 ![alt text](Images/drosteLadyAfter.jpg)
+
+"# Example Usage" <br/>
+```
+python3 droste.py Input.jpg
+```
