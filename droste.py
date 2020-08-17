@@ -1,12 +1,14 @@
 import numpy as np
 import cv2
 import random
+import sys
+import os.path
 # Math explained here: http://www.josleys.com/article_show.php?id=82
 
 class droste:
     def __init__(self, fPath, repeats=3,r1=0.2,r2=0.9):
         self.fPath = fPath
-        self.repeats = repeats 
+        self.repeats = repeats
         self.r1 = r1
         self.r2 = r2
 
@@ -157,7 +159,18 @@ class droste:
 
 
 def main():
-    fPath = 'INPUT.png'
+    # get the file address of input picture
+    fPath = None
+    if len(sys.argv) == 2: 
+        fPath = sys.argv[1]
+        if not os.path.isfile(fPath):
+            print("input picture does not exist")
+            return
+    else:
+        print("Need only one command line argument and that's the address of input picture")
+        return
+
+
     repeats = 3 # how many turns - Make it >1
     r1      = 0.2
     r2      = 0.9
@@ -169,7 +182,7 @@ def main():
     cv2.imwrite("OUTPUT.png", newImg)
     # Display resulting image
     window_name = 'new image - (some colors might be off)'
-    cv2.imshow(window_name,newImg)
+    cv2.imshow(window_name, newImg)
     # waits for user to press any key
     cv2.waitKey(0)
     # closing all open windows
