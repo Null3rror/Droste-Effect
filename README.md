@@ -20,6 +20,10 @@ Here are some Before and After Images.
 
 ![alt text](Images/drosteLadyAfter.jpg)
 
+![alt text](Images/PrettyGirl.jpg)
+
+![alt text](Images/PrettyGirlAfter.jpg)
+
 # Example Usage
 ```
 python3 droste.py Input.jpg
