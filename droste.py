@@ -5,62 +5,93 @@ import sys
 import os.path
 # Math explained here: http://www.josleys.com/article_show.php?id=82
 
-class droste:
-    def __init__(self, fPath, repeats=3,r1=0.2,r2=0.9):
-        self.fPath = fPath
+class Droste:
+    def __init__(self, fPath, repeats, r1, r2, xRange, yRange, resultFolderAddress):
         self.repeats = repeats
-        self.r1 = r1
-        self.r2 = r2
+        self.r1 = min(r1, r2)
+        self.r2 = max(r1, r2)
+        self.inputImg = cv2.imread(fPath, cv2.IMREAD_UNCHANGED) #returns a matrix-like object
+        self.xRange = xRange
+        self.yRange = yRange
+        self.resultFolderAddress = resultFolderAddress
 
-    def newImg(self):
-        # Builds  new plane (calls all functions!)
-
-        img, r, c, Z = self.Init()
-        if self.repeats != 1:
-            Xnew, Ynew = self.CalculateXNewYNewTILED(Z, r,c)  # takes in the complex plane, outputs the transformed plane
+    def Transform(self, method):
+        # Builds  new plane
+        img, r, c, Z = self.CreateComplexPlane()
+        if method == 1:
+            # 1: Ln -> Tile   -> Rotate -> exponent
+            self.Calculate1(Z, r, c)  # takes in the complex plane, outputs the transformed plane
         else:
-            Xnew, Ynew = self.CalculateXNewYNew(Z, r, c)  # Only the Log transform!
+            # 0: Ln -> Rotate -> Tile   -> exponent
+            self.Calculate(Z, r, c)  # takes in the complex plane, outputs the transformed plane
 
-        # Make transform
-        newImg = self.recreateImage(Xnew, Ynew, img, r, c, self.repeats)  # takes in new plane and projects the image on it
-        return newImg
 
-    def Init(self):
+    def CreateComplexPlane(self):
         '''
         :param self: loads the input image
         :return: the image as matrix, nbr of rows, nbr of cols, complex plane
         '''
-        img = cv2.imread(self.fPath, cv2.IMREAD_UNCHANGED) #returns a matrix-like object
+        img = self.inputImg
         r = img.shape[0] #nbr of rows
         c = img.shape[1] #nbr of cols
-        x = np.linspace(-1.0, 1.0, num=r, endpoint=True) #Returns an array of evenly spaced numbers over a specified interval.
-        y = np.linspace(-1.0, 1.0, num=c, endpoint=True)
+        x = np.linspace(-self.xRange, self.xRange, num=r, endpoint=True) #Returns an array of evenly spaced numbers over a specified interval.
+        y = np.linspace(-self.yRange, self.yRange, num=c, endpoint=True)
         X, Y = np.meshgrid(x, y, indexing='ij') #creates rect grid off arrays, here it uses Matrix indexing. Returns X, Y coordinates
         Z = X + (1j * Y); # Transf to the Complex Plane (then we will transform back to Cartesian) 1J is the imaginary part.
         return img, r, c, Z
 
 
-    def TILE(self,W, r, c):
-        W1 = np.array([[complex] * c * self.repeats] * r)
-        for i in range(self.repeats - 1):
-            if i == 0:
-                W1 = np.concatenate([W, W + (i + 1) * np.log(self.r2 / self.r1)], axis=1)
+    def TILE(self, W, r, c, repeatX, repeatY):
+        X = W.real
+        Y = W.imag
+
+        xOffset = np.log(self.r2 / self.r1)
+        repeatYHalf = int((repeatY - 1)/2)
+        repeatXHalf = int((repeatX - 1)/2)
+        for i in range(-repeatYHalf, repeatYHalf + 1):
+            W2 = None
+            for j in range(-repeatXHalf, repeatXHalf + 1):
+                if 0 == repeatXHalf + j:
+                    W2 = X + j * xOffset + (Y + 2 * np.pi * i) * 1j
+                else:
+                    W2 = np.concatenate([W2, X + j * xOffset + (Y + np.pi*2*i) * 1j], axis=0)
+            if 0 == repeatYHalf + i:
+                W1 = W2
             else:
-                W1 = np.concatenate([W1, W + (i + 1) * np.log(self.r2 / self.r1)], axis=1)
-        return W1;
+                W1 = np.concatenate([W1, W2], axis=1)
+        return W1
 
 
-    def LOG(self,z):
-        '''
-        :param z: Complex plane
-        :return: log(z/min(r1,r2))
-        '''
-        zLength = np.absolute(z)
-        if min(self.r1, self.r2) <= zLength and zLength <= max(self.r1, self.r2):
-            return (np.log(z / min(self.r1, self.r2)))
-        return 0
+    def TILE2(self, W, X, Y, repeatX, repeatY):
+        X = W.real
+        Y = W.imag
 
-    def LogTransform(self,Z, r, c):
+        repeatYHalf = int((repeatY - 1)/2)
+        repeatXHalf = int((repeatX - 1)/2)
+
+        alpha = np.arctan2(np.log(max(self.r2,self.r1) / min(self.r1, self.r2)), 2 * np.pi) # we need alpha to calculate the offsets
+        cosine = np.cos(alpha)
+        sine = np.sin(alpha)
+        yOffset = 2 * np.pi * sine * sine
+        xOffset = 2 * np.pi * sine * cosine
+
+        for i in range(-repeatYHalf, repeatYHalf + 1):
+            W2 = None
+            for j in range(-repeatXHalf, repeatXHalf + 1):
+                if 0 == repeatXHalf + j:
+                    W2 = X + j * xOffset + ((Y + (2 * np.pi * i + yOffset * j)) * 1j)
+                else:
+                    W2 = np.concatenate([W2, X + j * xOffset + ((Y + (2 * np.pi * i + yOffset * j)) * 1j)], axis=0)
+            if 0 == repeatYHalf + i:
+                W1 = W2
+            else:
+                W1 = np.concatenate([W1, W2], axis=1)
+
+        return W1
+
+
+
+    def LogTransform(self, Z, r, c):
         '''
         :param Z: Complex plane
         :param r: nbr of rows
@@ -68,47 +99,96 @@ class droste:
         :return: np.log(z / min(r1, r2))
         '''
         Z1 = Z[:r, :c].copy()
+        lnr1 = np.log(self.r1)
         for i in range(r):
             for j in range(c):
-                Z1[i][j] = self.LOG(Z1[i][j])
-        return (Z1)
+                z = Z[i][j]
+                zAbs = np.absolute(z)
+                if self.r1 <= zAbs and zAbs <= self.r2:
+                    theta = np.arctan2(z.imag, z.real)
+
+                    # map [-np.pi, 0] to [np.pi, 2*np.pi]
+                    if theta < 0:
+                        Z1[i][j] = np.log(zAbs) - lnr1 + 1j * (theta + 2*np.pi)
+                    # no need for mapping
+                    else:
+                        Z1[i][j] = np.log(zAbs) - lnr1 + 1j * (theta)
+                else:
+                    Z1[i][j] = 0
+        return Z1
 
 
-    def ExpTransform(self,Z, r, c):
-        Z1 = Z[:r, :c].copy()
-        for i in range(r):
-            for j in range(c):
-                Z1[i][j] = np.exp(Z1[i][j])
-        return (Z1)
+    def ExponentTransform(self, Z, r, c, repeatX, repeatY):
+        Z1 = Z[:r * repeatX, :c * repeatY].copy()
+        for i in range(r * repeatX):
+            for j in range(c * repeatY):
+                Z1[i][j] = np.exp(Z[i][j])
+        return Z1
 
 
-    def ROTATION(self,z, f, tetha):
-        return z * f * np.exp(1j * tetha)
-
-    def RotationTransformPi4(self,Z, r, c):
-        Z1 = Z[:r, :c].copy()
-        for i in range(r):
-            for j in range(c):
-                Z1[i][j] = self.ROTATION(Z1[i][j], 1, np.pi / 4)
-        return (Z1)
-
-
-    # ROTATE
-    def RotationTransform(self,Z, r, c):
-        Z1 = Z[:r, :c].copy()
-        alpha = np.arctan((np.log(max(self.r2,self.r1) / min(self.r1, self.r2)) / (2 * np.pi)))
+    def RotationTransform(self, Z, r, c, repeatX, repeatY):
+        Z1 = Z[:r * repeatX, :c * repeatY].copy()
+        alpha = np.arctan2(np.log(self.r2 / self.r1), 2 * np.pi)
         f = np.cos(alpha)
-        for i in range(r):
-            for j in range(c):
-                Z1[i][j] = self.ROTATION(Z1[i][j], f, alpha)
-        return (Z1)
+        for i in range(r * repeatX):
+            for j in range(c * repeatY):
+                Z1[i][j] = Z[i][j] * f * np.exp(1j * alpha)
+        return Z1
 
 
-    def makeNewXY(self,W, wmax, x):
-        return (np.multiply(np.add(np.divide(W, wmax), 1), x / 2))
+    def Calculate(self, Z, r, c):
+        print(Z.shape)
+        W1 = self.LogTransform(Z, r, c)
+        self.ReCreateImageAndSave(W1, "log-{}.{}-{}.{}.jpg".format(0, self.r1, self.r2, self.repeats), r, c, 1, 1)
+
+        W1 = self.RotationTransform(W1, r, c, 1, 1)
+        self.ReCreateImageAndSave(W1, "rot-{}.{}-{}.{}.jpg".format(0, self.r1, self.r2, self.repeats), r, c, 1, 1)
+
+        repeatX = self.repeats
+        repeatY = self.repeats
+        W1 = self.TILE2(W1, r, c, repeatX, repeatY)
+        print(W1.shape)
+        self.ReCreateImageAndSave(W1, "tile-{}.{}-{}.{}.jpg".format(0, self.r1, self.r2, self.repeats), r, c, repeatX, repeatY)
+
+        W1 = self.ExponentTransform(W1, r, c, repeatX, repeatY)
+        self.ReCreateImageAndSave(W1, "final-{}.{}-{}.{}.jpg".format(0, self.r1, self.r2, self.repeats), r, c, repeatX, repeatY)
+
+    def Calculate1(self, Z, r, c):
+        print(Z.shape)
+        # apply Ln(z/r1)
+        W1 = self.LogTransform(Z, r, c)
+        self.ReCreateImageAndSave(W1, "log-{}.{}-{}.{}.jpg".format(1, self.r1, self.r2, self.repeats), r, c, 1, 1)
+
+        # choose how many tiles we want to add
+        repeatX = self.repeats
+        repeatY = self.repeats
+        # apply Tile
+        W1 = self.TILE(W1, r, c, repeatX, repeatY)
+        print(W1.shape)
+        self.ReCreateImageAndSave(W1, "tile-{}.{}-{}.{}.jpg".format(1, self.r1, self.r2, self.repeats), r, c, repeatX, repeatY)
+
+        # apply Rotation
+        W1 = self.RotationTransform(W1, r, c, repeatX, repeatY)
+        self.ReCreateImageAndSave(W1, "rot-{}.{}-{}.{}.jpg".format(1, self.r1, self.r2, self.repeats), r, c, repeatX, repeatY)
+
+        # apply exponent
+        W1 = self.ExponentTransform(W1, r, c, repeatX, repeatY)
+        self.ReCreateImageAndSave(W1, "final-{}.{}-{}.{}.jpg".format(1, self.r1, self.r2, self.repeats), r, c, repeatX, repeatY)
 
 
-    def recreateImage(self, Xnew, Ynew, img, r, c, repeat):
+    def makeNewXY(self, W, wmax, x):
+        return np.multiply(np.add(np.divide(W, wmax), 1), x / 2)
+
+    def GetNewXY(self, W, r, c, repeatX, repeatY):
+        Wx = np.real(W)
+        Wy = np.imag(W)
+        wxmax = np.absolute(Wx).max()
+        wymax = np.absolute(Wy).max()
+        XNew = self.makeNewXY(Wx, wxmax, c * repeatY)
+        YNew = self.makeNewXY(Wy, wymax, r * repeatX)
+        return XNew, YNew
+
+    def ReCreateImage(self, Xnew, Ynew, img, r, c, repeatX, repeatY):
         '''
         :param Xnew:
         :param Ynew:
@@ -118,75 +198,74 @@ class droste:
         :param repeat:
         :return: A matrix representing the pic in the new coordinates
         '''
-        newImg = np.zeros([r, c * repeat, 3]) #
-        for i in range(r):
-            for j in range(c * repeat):
+        newImg = np.zeros([r * repeatX, c * repeatY, 3])
+        for i in range(r * repeatX):
+            for j in range(c * repeatY):
                 for k in range(3):
-                    if int(Xnew[i, j]) == c * repeat:
-                        Xnew[i, j] = c * repeat - 1
-                    if int(Ynew[i, j]) == r:
-                        Ynew[i, j] = r - 1
-                    newImg[int(Ynew[i, j])][int(Xnew[i, j])][k] = img[i, j % c, k]
+                    if int(Xnew[i, j]) == c * repeatY:
+                        Xnew[i, j] = c * repeatY - 1
+                    if int(Ynew[i, j]) == r * repeatX:
+                        Ynew[i, j] = r * repeatX - 1
+                    newImg[int(Ynew[i, j])][int(Xnew[i, j])][k] = img[i % r, j % c, k] # extract RGB from inputImage
         return newImg
 
 
-    def CalculateXNewYNew(self,Z, r, c):
-        W = self.LogTransform(Z, r, c)
-        # W = RotationTransformPi4(Z, r, c)
-        Wx = np.real(W)
-        Wy = np.imag(W)
-        wxmax = np.absolute(Wx).max()
-        wymax = np.absolute(Wy).max()
-        Xnew = self.makeNewXY(Wx, wxmax, c)
-        Ynew = self.makeNewXY(Wy, wymax, r)
-        return Xnew, Ynew
 
+    def ReCreateImageAndSave(self, W, imgTitle, r, c, repeatX, repeatY):
+        xNew, yNew = self.GetNewXY(W, r, c, repeatX, repeatY)
+        img = self.ReCreateImage(xNew, yNew, self.inputImg, r, c, repeatX, repeatY)
+        cv2.imwrite(self.resultFolderAddress + '/' + imgTitle, img)
 
-    def CalculateXNewYNewTILED(self, Z, r, c):
-        print(Z.shape)
-        W = self.LogTransform(Z, r, c)
-        W1 = self.TILE(W, r, c)
-        print(W1.shape)
-        W1 = self.RotationTransform(W1, r, c * self.repeats)
-        W1 = self.ExpTransform(W1, r, c * self.repeats)
-        Wx = np.real(W1)
-        Wy = np.imag(W1)
-        wxmax = np.absolute(Wx).max()
-        wymax = np.absolute(Wy).max()
-        Xnew = self.makeNewXY(Wx, wxmax, c * self.repeats)
-        Ynew = self.makeNewXY(Wy, wymax, r)
-        return Xnew, Ynew
+def GetCommandLineArgs():
+    '''
+    Gets command line argumets, does some error checking.
+    :return: command line arguments
+             fPath must be valid
+             method must be 0 or 1
+             repeats must be positive and odd
+    '''
+    if len(sys.argv) == 4:
+        fPath = sys.argv[1] # Get input File name
+        method = int(sys.argv[2])
+        repeats = int(sys.argv[3])
+        if not os.path.isfile(fPath):
+            sys.exit("Input picture does not exist")
+        if not (method == 0 or method == 1):
+            sys.exit("Method must be 0 or 1")
+        if repeats <= 0 or repeats & 1 == 0:
+            sys.exit("Repeats must be positive and odd")
+        return fPath, method, repeats
+    else:
+        sys.exit("Need only two command line argument and that's the address of input picture and method number\nMethod number is either 0 or 1\nRepeats must be positive and odd")
 
+def CreateOutputFolder(inputImagePath, repeats, method, r1, r2):
+    '''
+    :param inputImagePath: address of our input image
+    :param repeats:        number of repeats
+    :return: address of the result folder
+    '''
+    inputImageName = inputImagePath.split('/')[-1] # extract input image name
+    outputFolder = "OutputImages/"        # pictures will be stored
+
+    resultFolderAddress = outputFolder + inputImageName + "-{}.{}-{}.{}.jpg".format(method, r1, r2, repeats) # the folder that our code is stored in
+    if not os.path.exists(resultFolderAddress): # create the result folder
+        os.makedirs(resultFolderAddress)
+    return resultFolderAddress
 
 def main():
-    # get the file address of input picture
-    fPath = None
-    if len(sys.argv) == 2: 
-        fPath = sys.argv[1]
-        if not os.path.isfile(fPath):
-            print("input picture does not exist")
-            return
-    else:
-        print("Need only one command line argument and that's the address of input picture")
-        return
+    inputImagePath, method, repeats = GetCommandLineArgs()
+    # We have two methods of calculating the result
+    # 0: Ln -> Rotate -> Tile   -> exponent
+    # 1: Ln -> Tile   -> Rotate -> exponent
 
+    r1      = 0.2      # inner circle radius
+    r2      = 0.9      # outer circle radius
 
-    repeats = 3 # how many turns - Make it >1
-    r1      = 0.2
-    r2      = 0.9
+    resultFolderAddress = CreateOutputFolder(inputImagePath, repeats, method, r1, r2)
 
-    d= droste(fPath, repeats,r1,r2)
-    newImg = d.newImg()
+    d = Droste(inputImagePath, repeats, r1, r2, -1, 1, resultFolderAddress)
 
-    # Saves output  - the transformed picture
-    cv2.imwrite("OUTPUT.png", newImg)
-    # Display resulting image
-    window_name = 'new image - (some colors might be off)'
-    cv2.imshow(window_name, newImg)
-    # waits for user to press any key
-    cv2.waitKey(0)
-    # closing all open windows
-    cv2.destroyAllWindows()
+    d.Transform(method)
 
 
 if __name__ == "__main__":
