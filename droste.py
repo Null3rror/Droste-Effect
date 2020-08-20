@@ -34,11 +34,12 @@ class Droste:
         img = self.inputImg
         r = img.shape[0] #nbr of rows
         c = img.shape[1] #nbr of cols
-        x = np.linspace(-self.xRange, self.xRange, num=r, endpoint=True) #Returns an array of evenly spaced numbers over a specified interval.
-        y = np.linspace(-self.yRange, self.yRange, num=c, endpoint=True)
+        x = np.linspace(-self.xRange, self.xRange, num=r, endpoint=True, dtype=np.float32) #Returns an array of evenly spaced numbers over a specified interval.
+        y = np.linspace(-self.yRange, self.yRange, num=c, endpoint=True, dtype=np.float32)
         X, Y = np.meshgrid(x, y, indexing='ij') #creates rect grid off arrays, here it uses Matrix indexing. Returns X, Y coordinates
         Z = X + (1j * Y); # Transf to the Complex Plane (then we will transform back to Cartesian) 1J is the imaginary part.
         return img, r, c, Z
+
 
 
     def TILE(self, W, r, c, repeatX, repeatY):
@@ -98,31 +99,19 @@ class Droste:
         :param c: nbr of cols
         :return: np.log(z / min(r1, r2))
         '''
-        Z1 = Z[:r, :c].copy()
-        lnr1 = np.log(self.r1)
-        for i in range(r):
-            for j in range(c):
-                z = Z[i][j]
-                zAbs = np.absolute(z)
-                if self.r1 <= zAbs and zAbs <= self.r2:
-                    theta = np.arctan2(z.imag, z.real)
+        Z1 = np.zeros([r, c], dtype=complex)
 
-                    # map [-np.pi, 0] to [np.pi, 2*np.pi]
-                    if theta < 0:
-                        Z1[i][j] = np.log(zAbs) - lnr1 + 1j * (theta + 2*np.pi)
-                    # no need for mapping
-                    else:
-                        Z1[i][j] = np.log(zAbs) - lnr1 + 1j * (theta)
-                else:
-                    Z1[i][j] = 0
+        ZAbs = np.absolute(Z)
+        elemetsToApplyTransformation = (self.r1 <= ZAbs) & (ZAbs <= self.r2)
+
+        Z1[elemetsToApplyTransformation] = np.log(Z[elemetsToApplyTransformation])
+
         return Z1
 
 
     def ExponentTransform(self, Z, r, c, repeatX, repeatY):
         Z1 = Z[:r * repeatX, :c * repeatY].copy()
-        for i in range(r * repeatX):
-            for j in range(c * repeatY):
-                Z1[i][j] = np.exp(Z[i][j])
+        Z1 = np.exp(Z)
         return Z1
 
 
@@ -130,9 +119,8 @@ class Droste:
         Z1 = Z[:r * repeatX, :c * repeatY].copy()
         alpha = np.arctan2(np.log(self.r2 / self.r1), 2 * np.pi)
         f = np.cos(alpha)
-        for i in range(r * repeatX):
-            for j in range(c * repeatY):
-                Z1[i][j] = Z[i][j] * f * np.exp(1j * alpha)
+
+        Z1 = Z * f * np.exp(1j * alpha)
         return Z1
 
 
@@ -145,7 +133,7 @@ class Droste:
         self.ReCreateImageAndSave(W1, "rot-{}.{}-{}.{}.jpg".format(0, self.r1, self.r2, self.repeats), r, c, 1, 1)
 
         repeatX = self.repeats
-        repeatY = self.repeats
+        repeatY = 1
         W1 = self.TILE2(W1, r, c, repeatX, repeatY)
         print(W1.shape)
         self.ReCreateImageAndSave(W1, "tile-{}.{}-{}.{}.jpg".format(0, self.r1, self.r2, self.repeats), r, c, repeatX, repeatY)
@@ -161,13 +149,13 @@ class Droste:
 
         # choose how many tiles we want to add
         repeatX = self.repeats
-        repeatY = self.repeats
-        # apply Tile
+        repeatY = 1
+        # # apply Tile
         W1 = self.TILE(W1, r, c, repeatX, repeatY)
         print(W1.shape)
         self.ReCreateImageAndSave(W1, "tile-{}.{}-{}.{}.jpg".format(1, self.r1, self.r2, self.repeats), r, c, repeatX, repeatY)
-
-        # apply Rotation
+        #
+        # # apply Rotation
         W1 = self.RotationTransform(W1, r, c, repeatX, repeatY)
         self.ReCreateImageAndSave(W1, "rot-{}.{}-{}.{}.jpg".format(1, self.r1, self.r2, self.repeats), r, c, repeatX, repeatY)
 
@@ -201,12 +189,12 @@ class Droste:
         newImg = np.zeros([r * repeatX, c * repeatY, 3])
         for i in range(r * repeatX):
             for j in range(c * repeatY):
-                for k in range(3):
-                    if int(Xnew[i, j]) == c * repeatY:
-                        Xnew[i, j] = c * repeatY - 1
-                    if int(Ynew[i, j]) == r * repeatX:
-                        Ynew[i, j] = r * repeatX - 1
-                    newImg[int(Ynew[i, j])][int(Xnew[i, j])][k] = img[i % r, j % c, k] # extract RGB from inputImage
+                if int(Xnew[i, j]) == c * repeatY:
+                    Xnew[i, j] = c * repeatY - 1
+                if int(Ynew[i, j]) == r * repeatX:
+                    Ynew[i, j] = r * repeatX - 1
+                newImg[int(Ynew[i, j])][int(Xnew[i, j])] = img[i % r, j % c] # extract RGB from inputImage
+
         return newImg
 
 
@@ -259,7 +247,7 @@ def main():
     # 1: Ln -> Tile   -> Rotate -> exponent
 
     r1      = 0.2      # inner circle radius
-    r2      = 0.9      # outer circle radius
+    r2      = 0.99    # outer circle radius
 
     resultFolderAddress = CreateOutputFolder(inputImagePath, repeats, method, r1, r2)
 
