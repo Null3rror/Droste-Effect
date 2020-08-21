@@ -16,6 +16,23 @@ Here are some Before and After Images.
 
 ![alt text](OutputImages/image067.jpg-1.0.2-0.99.3-1.jpg/final-1.0.2-0.99.3-1.jpg)
 
+
+
+![alt text](Images/clock.jpg)
+
+
+![alt text](OutputImages/image067.jpg-1.0.2-0.99.3-1.jpg/final-1.0.2-0.99.3-1.jpg)
+
+
+
+![alt text](Images/b.jpg)
+
+
+![alt text](OutputImages/final-1.0.2-0.99.3-3.jpg)
+
+
+![alt text](OutputImages/final-1.0.2-0.99.5-5.jpg)
+
 # Example Usage
 first parameter is the image path
 second parameter is the method(has to be 0 or 1)
