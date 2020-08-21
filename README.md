@@ -21,7 +21,7 @@ Here are some Before and After Images.
 ![alt text](Images/clock.jpg)
 
 
-![alt text](OutputImages/image067.jpg-1.0.2-0.99.3-1.jpg/final-1.0.2-0.99.3-1.jpg)
+![alt text](OutputImages/final-0.0.2-0.99.3-1.jpg)
 
 
 
